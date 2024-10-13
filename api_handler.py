@@ -2,7 +2,7 @@ import requests
 import json
 import logging
 
-def get_all_qbs(token, search=None, page=1, limit=25):
+def get_all_qbs(token, search=None, page=1, limit=100):
     url = 'https://api.examly.io/api/v2/questionbanks'
     headers = {
         'accept': 'application/json, text/plain, */*',
@@ -22,7 +22,6 @@ def get_all_qbs(token, search=None, page=1, limit=25):
         "mainDepartmentUser": True
     }
     
-    # Only add the search parameter if it's not None or empty
     if search:
         payload["search"] = search
 
