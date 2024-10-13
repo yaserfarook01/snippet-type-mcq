@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import os
 import logging
+import traceback
 from prompt import generate_mcqs, problem_solving_types
 from db import question_bank
 from api_handler import get_all_qbs, import_mcqs_to_examly
@@ -9,9 +10,13 @@ from convertor import save_to_file, convert_to_json_format, save_unique_mcqs
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # Streamlit UI
 st.title("MCQ Generator and Importer")
+
+# MCQ Generation Section
+st.header("Generate MCQs")
 
 topic = st.text_input("Enter Topic:")
 num_questions = st.number_input("Number of Questions to Generate", min_value=1, max_value=100, value=10)
@@ -41,18 +46,12 @@ if st.button("Generate MCQs"):
         
         # Save unique questions to a new file
         unique_mcqs_file = 'unique_mcqs.json'
-        save_unique_mcqs(unique_questions, unique_mcqs_file)
+        with open(unique_mcqs_file, 'w', encoding='utf-8') as f:
+            json.dump(unique_questions, f, ensure_ascii=False, indent=2)
         
         st.success(f"{len(unique_questions)} new unique questions added to Elasticsearch and saved to {unique_mcqs_file}. {duplicates} duplicates skipped.")
         
-        # Display a sample of the generated MCQs
-        zst.text(mcqs[:500] + "...")  # Display first 500 characters
-        
-        # # Display all unique questions
-        # st.subheader("Unique Questions:")
-        # for q in unique_questions:
-        #     st.write(q['question_data'])
-        #     st.write("---")
+
         
         # Display some duplicate questions (if any)
         if duplicates > 0:
@@ -65,48 +64,64 @@ if st.button("Generate MCQs"):
                     st.write(q['question_data'])
                     st.write("---")
         
-        # Ask if user wants to import to Examly
-        if st.button("Import to Examly"):
-            # Input field for token
-            token = st.text_input("Enter Authorization Token:", type="password")
-            
-            if token:
-                # Fetch all Question Banks
-                qbs = get_all_qbs(token)
-                
-                if qbs and 'data' in qbs:
-                    # Create a search box for QB names
-                    search_term = st.text_input("Search for a Question Bank:")
-                    
-                    if st.button("Search"):
-                        # Fetch Question Banks based on search term
-                        qbs = get_all_qbs(token, search=search_term)
-                    
-                    if qbs and 'data' in qbs:
-                        # Create a dictionary of QB names to QB IDs
-                        qb_dict = {qb['name']: qb['id'] for qb in qbs['data']}
-                        
-                        # Display QB names in a selectbox
-                        selected_qb_name = st.selectbox("Select a Question Bank:", list(qb_dict.keys()))
-                        
-                        if selected_qb_name:
-                            selected_qb_id = qb_dict[selected_qb_name]
-                            
-                            if st.button(f"Import to {selected_qb_name}"):
-                                try:
-                                    successful_uploads, failed_uploads = import_mcqs_to_examly(unique_mcqs_file, selected_qb_id, created_by, token)
-                                    st.success(f"MCQs imported to {selected_qb_name}. Successful: {successful_uploads}, Failed: {failed_uploads}")
-                                except Exception as e:
-                                    st.error(f"Error importing MCQs: {str(e)}")
-                                    st.error(f"Error details: {logging.exception('Error during MCQ import')}")
-                    else:
-                        st.error("No Question Banks found. Please try a different search term.")
-                else:
-                    st.error("Failed to fetch Question Banks. Please check your authorization token and try again.")
-            else:
-                st.warning("Please enter a valid Authorization Token.")
-        
     except Exception as e:
         st.error(f"Error generating MCQs: {str(e)}")
-        logging.exception("Error in MCQ generation and processing")
+        logger.exception("Error in MCQ generation and processing")
 
+# Question Bank Fetching Section
+st.header("Fetch Question Banks")
+token = st.text_input("Enter your authorization token:", type="password")
+search_query = st.text_input("Search question banks:")
+
+if 'question_banks' not in st.session_state:
+    st.session_state.question_banks = None
+
+if st.button("Search Question Banks"):
+    if token:
+        with st.spinner("Searching question banks..."):
+            question_banks = get_all_qbs(token, search_query, limit=50)
+        st.session_state.question_banks = question_banks
+    else:
+        st.warning("Please enter your authorization token.")
+
+if st.session_state.question_banks:
+    question_banks = st.session_state.question_banks
+    if 'results' in question_banks and 'questionbanks' in question_banks['results']:
+        qb_options = [(qb['qb_name'], qb['qb_id']) for qb in question_banks['results']['questionbanks']]
+        
+        st.success(f"Found {len(qb_options)} matching question banks.")
+        
+        # Use radio buttons for selection
+        st.subheader("Select a Question Bank:")
+        selected_qb = st.radio(
+            "Choose a question bank:",
+            options=qb_options,
+            format_func=lambda x: x[0]  # Display only the name in the radio button
+        )
+
+        if selected_qb:
+            st.session_state.selected_qb_id = selected_qb[1]  # Store the selected qb_id
+            st.info(f"Selected Question Bank: {selected_qb[0]}")
+    else:
+        st.error("Failed to fetch question banks. Please check your token and try again.")
+
+# MCQ Import Section
+st.header("Import MCQs to Examly")
+
+if 'selected_qb_id' in st.session_state:
+    qb_id = st.session_state.selected_qb_id
+    st.write(f"Selected Question Bank ID: {qb_id}")
+else:
+    qb_id = st.text_input("Enter Question Bank ID (qb_id):")
+
+if st.button("Import MCQs to Examly"):
+    if qb_id and token:
+        try:
+            # Import to Examly
+            successful_uploads, failed_uploads = import_mcqs_to_examly('unique_mcqs.json', qb_id, "19d0e40a-fd35-4741-89ab-11f3c7d4b118", token)
+            st.success(f"MCQs imported to Examly. Successful: {successful_uploads}, Failed: {failed_uploads}")
+        except Exception as e:
+            st.error(f"Error importing MCQs: {str(e)}")
+            st.error(f"Error details: {traceback.format_exc()}")
+    else:
+        st.warning("Please enter valid Question Bank ID and Authorization Token.")
