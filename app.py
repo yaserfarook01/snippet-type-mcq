@@ -5,7 +5,7 @@ import logging
 import traceback
 from prompt import generate_mcqs, problem_solving_types
 from db import question_bank
-from api_handler import get_all_qbs, import_mcqs_to_examly
+from api_handler import get_all_qbs, import_mcqs_to_examly, get_all_qbs_neowise, import_mcqs_to_neowise
 from convertor import save_to_file, convert_to_json_format, save_unique_mcqs
 
 # Set up logging
@@ -51,22 +51,13 @@ if st.button("Generate MCQs"):
         
         st.success(f"{len(unique_questions)} new unique questions added to Elasticsearch and saved to {unique_mcqs_file}. {duplicates} duplicates skipped.")
         
-
-        
-        # Display some duplicate questions (if any)
-        if duplicates > 0:
-            st.subheader("Sample of Duplicate Questions:")
-            duplicate_count = min(5, duplicates)  # Display up to 5 duplicates
-            for i, q in enumerate(json_questions):
-                if i >= duplicate_count:
-                    break
-                if q not in unique_questions:
-                    st.write(q['question_data'])
-                    st.write("---")
-        
     except Exception as e:
         st.error(f"Error generating MCQs: {str(e)}")
         logger.exception("Error in MCQ generation and processing")
+
+# Domain Selection
+st.header("Select Domain")
+domain = st.radio("Choose a domain:", ["LTI", "Neowise"])
 
 # Question Bank Fetching Section
 st.header("Fetch Question Banks")
@@ -79,7 +70,10 @@ if 'question_banks' not in st.session_state:
 if st.button("Search Question Banks"):
     if token:
         with st.spinner("Searching question banks..."):
-            question_banks = get_all_qbs(token, search_query, limit=50)
+            if domain == "LTI":
+                question_banks = get_all_qbs(token, search_query, limit=50)
+            else:  # Neowise
+                question_banks = get_all_qbs_neowise(token, search_query, limit=50)
         st.session_state.question_banks = question_banks
     else:
         st.warning("Please enter your authorization token.")
@@ -106,7 +100,7 @@ if st.session_state.question_banks:
         st.error("Failed to fetch question banks. Please check your token and try again.")
 
 # MCQ Import Section
-st.header("Import MCQs to Examly")
+st.header(f"Import MCQs to {domain}")
 
 if 'selected_qb_id' in st.session_state:
     qb_id = st.session_state.selected_qb_id
@@ -114,12 +108,14 @@ if 'selected_qb_id' in st.session_state:
 else:
     qb_id = st.text_input("Enter Question Bank ID (qb_id):")
 
-if st.button("Import MCQs to Examly"):
+if st.button(f"Import MCQs to {domain}"):
     if qb_id and token:
         try:
-            # Import to Examly
-            successful_uploads, failed_uploads = import_mcqs_to_examly('unique_mcqs.json', qb_id, "19d0e40a-fd35-4741-89ab-11f3c7d4b118", token)
-            st.success(f"MCQs imported to Examly. Successful: {successful_uploads}, Failed: {failed_uploads}")
+            if domain == "LTI":
+                successful_uploads, failed_uploads = import_mcqs_to_examly('unique_mcqs.json', qb_id, "19d0e40a-fd35-4741-89ab-11f3c7d4b118", token)
+            else:  # Neowise
+                successful_uploads, failed_uploads = import_mcqs_to_neowise('unique_mcqs.json', qb_id, "19d0e40a-fd35-4741-89ab-11f3c7d4b118", token)
+            st.success(f"MCQs imported to {domain}. Successful: {successful_uploads}, Failed: {failed_uploads}")
         except Exception as e:
             st.error(f"Error importing MCQs: {str(e)}")
             st.error(f"Error details: {traceback.format_exc()}")
