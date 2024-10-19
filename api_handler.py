@@ -69,3 +69,73 @@ def import_mcqs_to_examly(input_file, qb_id, created_by, token):
             failed_uploads += 1
     
     return successful_uploads, failed_uploads
+
+
+    
+def get_all_qbs_neowise(token, search=None, page=1, limit=25):
+    url = 'https://api.examly.io/api/v2/questionbanks'
+    headers = {
+        'accept': 'application/json, text/plain, */*',
+        'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8',
+        'authorization': token,
+        'content-type': 'application/json',
+        'origin': 'https://admin.neowise.examly.io',
+        'referer': 'https://admin.neowise.examly.io/',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'
+    }
+    payload = {
+        "branch_id": "all",
+        "page": page,
+        "limit": limit,
+        "visibility": "All",
+        "department_id": ["135950e9-d50e-46e0-bd83-672abdd75a44","e7ff788f-c169-4912-becc-922f60c22f33","1eb3f9be-949f-4366-93ff-38e8bc294204","8ce00f56-d771-4022-9db3-9cce403018bb","828a7982-06ea-42e9-ab66-49d479b74a1b","5c7faff9-4310-4052-9436-87fc02c0c8c7","02ff769d-0bdc-4b25-9598-6dd51ece3f94","b2a160ce-3c07-4f76-9141-9b183c1bc6d8","fde42d90-8163-479c-a4ab-fde8215ad22f","061912a6-6a43-4ace-b2a0-148ced4eb965","86430ada-0377-4cc9-9d1c-457928599f80","607bcef9-d910-4aac-b8dd-9db51424b370","072ec628-8569-43b3-a232-b5048398bbb3","3127e585-28e1-4140-8322-4081a22bb52b","3b13d51e-8e1e-47be-97ed-0801312ebf5f","ea34c967-7202-493f-ac56-c79ae79e06c5","55e39f8a-919f-4da6-a1e3-a700cef45cf2","cef01ce9-8b8a-494e-a0f5-2c56925fb7bf","f03e4d7d-ab35-4164-a9e8-580fce7acc1f","dc8f9b62-4920-4405-90d9-4debfa298549","05542ae9-203f-48cb-8090-01409d1415e7","720ce887-66da-4927-ad6a-ab9c07aa9492","497de26c-ecf6-4734-aac8-86e87e75daa5"],
+        "mainDepartmentUser": True
+    }
+    
+    if search:
+        payload["search"] = search
+
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error fetching Question Banks from Neowise: {e}")
+        if hasattr(e, 'response'):
+            logging.error(f"Response content: {e.response.content}")
+        return None
+
+def import_mcqs_to_neowise(input_file, qb_id, created_by, token):
+    with open(input_file, 'r', encoding='utf-8') as f:
+        unique_questions = json.load(f)
+    
+    url = 'https://api.examly.io/api/mcq_question/create'
+    headers = {
+        'accept': 'application/json, text/plain, */*',
+        'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8',
+        'authorization': token,
+        'content-type': 'application/json',
+        'origin': 'https://admin.neowise.examly.io',
+        'referer': 'https://admin.neowise.examly.io/',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'
+    }
+    
+    successful_uploads = 0
+    failed_uploads = 0
+
+    for question in unique_questions:
+        question_to_post = question.copy()
+        question_to_post.pop('question_vector', None)
+        question_to_post['qb_id'] = qb_id
+        if not question_to_post['tags']:
+            question_to_post['tags'] = [""]
+        
+        try:
+            response = requests.post(url, json=question_to_post, headers=headers)
+            response.raise_for_status()
+            successful_uploads += 1
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error posting question to Neowise: {e}")
+            failed_uploads += 1
+    
+    return successful_uploads, failed_uploads
