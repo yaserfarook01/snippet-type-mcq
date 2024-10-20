@@ -30,7 +30,7 @@ def convert_to_json_format(input_file, qb_id, created_by):
             question_text = question_match.group(1).strip()
 
             # Extract code snippet
-            code_match = re.search(r'```(?:java|html|javascript|typescript)\n(.*?)```', question, re.DOTALL)
+            code_match = re.search(r'```(?:java|javascript|html|typescript|cpp|csharp)\n(.*?)```', question, re.DOTALL)
             code_block = code_match.group(1).strip() if code_match else ""
 
             # Combine question text and code block
@@ -46,7 +46,7 @@ def convert_to_json_format(input_file, qb_id, created_by):
             processed_options = []
             for option in options:
                 # Remove ```java and ``` if present
-                option = re.sub(r'```(java|html|javascript|typescript)\n?|```|`', '', option)
+                option = re.sub(r'```(java|javascript|html|typescript|cpp|csharp)\n?|```|`', '', option)
                 # Remove leading/trailing whitespace and newlines
                 option = option.strip()
                 processed_options.append(option)
