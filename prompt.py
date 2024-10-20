@@ -1,3 +1,4 @@
+import json
 import logging
 from openai import AzureOpenAI
 import time
@@ -16,6 +17,17 @@ client = AzureOpenAI(
     api_version="2024-02-01"
 )
 
+# Load JSON files
+with open('question_type_instructions.json', 'r') as f:
+    question_type_instructions = json.load(f)
+
+with open('difficulty_definitions.json', 'r') as f:
+    difficulty_definitions = json.load(f)
+
+with open('few_shot_examples.json', 'r') as f:
+    few_shot_examples = json.load(f)
+
+# Define problem_solving_types
 problem_solving_types = [
     "Output prediction",
     "Error identification",
@@ -34,222 +46,87 @@ problem_solving_types = [
     "Algorithm selection"
 ]
 
-# Updated prompt template
-prompt_template = """
-Generate {num_questions} unique multiple-choice questions (MCQs) about {topic} with {difficulty} difficulty. The questions should be of type: {question_type}.
-
-Topic Focus: Ensure all questions are directly related to {topic}. Do not include questions about unrelated concepts unless explicitly requested.
-
-Difficulty Levels:
-{difficulty_definition}
-
-Question Types:
-{question_type_instruction}
-
-Format each question and answer as follows:
-
-Q1. [Question text]
-1) [Option 1]
-2) [Option 2]
-3) [Option 3]
-4) [Option 4]
-Correct answer: [Correct option number]
-Difficulty: {difficulty}
-Subject: [Relevant subject area]
-Topic: {topic}
-Sub-topic: [Relevant sub-topic of {topic}]
-Tags: [Relevant tags related to {topic}]
-
----
-
-Repeat this format for all {num_questions} questions. Ensure that each question is separated by the "---" delimiter.
-
-Remember to vary the complexity and focus of the questions while maintaining the specified difficulty level and question type, always focusing on {topic}.
-"""
-
-conceptual_instruction = """
-Focus on theoretical understanding of {topic}. Questions should test knowledge of definitions, principles, and concepts without necessarily involving code.
-"""
-
-factual_instruction = """
-Emphasize specific facts, rules, or characteristics related to {topic}. Questions should test recall and precise knowledge of {topic}.
-"""
-
-problem_solving_instruction = """
-For problem-solving questions related to {topic}, provide code snippets where required and focus on the following types of questions:
-
-1. Output prediction: "What will be the output of the following code that demonstrates {topic}?"
-2. Error identification: "Which line contains an error related to {topic} in the code below?"
-3. Debugging: "What change needs to be made to fix the bug related to {topic} in this code?"
-   For debugging questions, provide a code snippet with a bug and ask what change is needed to fix it. 
-   The options should be in code format. For example:
-
-   The following code snippet attempts to demonstrate the use of {topic}:
-   ```
-   // Code demonstrating {topic}
-   // ...
-   ```
-   What change needs to be made to fix the bug related to {topic} in this code?
-
-   1) ```
-      // Option 1 demonstrating a fix related to {topic}
-      ```
-   2) ```
-      // Option 2 demonstrating a fix related to {topic}
-      ```
-   3) ```
-      // Option 3 demonstrating a fix related to {topic}
-      ```
-   4) ```
-      // Option 4 demonstrating a fix related to {topic}
-      ```
-
-4. Code completion: "Which option correctly completes the missing part of this code related to {topic}?"
-5. Concept identification: "Which {topic}-related concept is demonstrated in this snippet?"
-6. Best practices: "Which of the following changes would improve the code's use of {topic}?"
-7. Function behavior: "What does the following function do with respect to {topic}?"
-8. Variable state: "What will be the value of variable X after this code related to {topic} executes?"
-9. Logical equivalence: "Which of the following code snippets is logically equivalent to the given code in terms of {topic}?"
-10. Code optimization: "Which option provides the most optimized version of this code with respect to {topic}?"
-11. Algorithm selection: "Which algorithm is most appropriate for implementing this {topic}-related functionality?"
-12. Time complexity: "What is the time complexity of the following algorithm related to {topic}?"
-13. Space complexity: "What is the space complexity of the following function implementing {topic}?"
-
-Ensure a mix of these question types in your generated MCQs, always focusing on {topic}. For debugging questions, always provide the options in code format. Use pseudocode or a general programming syntax that can be easily understood across different programming languages.
-"""
-
-# Conceptual/Factual difficulty definitions
-conceptual_factual_easy = """
-- Test basic understanding and recall of {topic} concepts
-- Use simple terminology and straightforward questions
-- Focus on fundamental aspects of {topic}
-- Have clear, distinct options with only one correct answer
-- Require basic knowledge and simple application of {topic}
-
-Example:
-Q: What is the primary purpose of {topic} in programming?
-1) [Basic purpose 1]
-2) [Basic purpose 2]
-3) [Basic purpose 3]
-4) [Basic purpose 4]
-Correct answer: [Correct option number]
-"""
-
-conceptual_factual_medium = """
-- Test deeper understanding of {topic} concepts
-- Require application of knowledge in slightly more complex scenarios
-- May involve comparing or contrasting different aspects of {topic}
-- Include more nuanced options that require careful consideration
-- Test understanding of how {topic} relates to other basic programming concepts
-
-Example:
-Q: How does {topic} differ from [related concept] in terms of [specific aspect]?
-1) [Nuanced difference 1]
-2) [Nuanced difference 2]
-3) [Nuanced difference 3]
-4) [Nuanced difference 4]
-Correct answer: [Correct option number]
-"""
-
-conceptual_factual_hard = """
-- Test advanced understanding and intricate details of {topic}
-- Require analysis and evaluation of complex aspects of {topic}
-- May involve edge cases or less common applications of {topic}
-- Have very plausible distractors that require expert knowledge to differentiate
-- Test deep understanding of how {topic} interacts with advanced programming concepts
-
-Example:
-Q: In what scenario would using {topic} be disadvantageous compared to [alternative approach]?
-1) [Complex scenario 1]
-2) [Complex scenario 2]
-3) [Complex scenario 3]
-4) [Complex scenario 4]
-Correct answer: [Correct option number]
-"""
-
-# Problem-solving difficulty definitions
-problem_solving_easy = """
-- Test basic syntax and simple programming concepts related to {topic}
-- Involve single operations or straightforward code snippets
-- Focus on fundamental data types, operators, and control structures relevant to {topic}
-- Have clear, distinct options with only one correct answer
-- Require recall of basic programming rules and simple application of knowledge about {topic}
-
-Example:
-Q: What will be the output of the following code snippet related to {topic}?
-1) [Moderate complexity result 1]
-2) [Moderate complexity result 2]
-3) [Moderate complexity result 3]
-4) [Moderate complexity result 4]
-Correct answer: [Correct option number]
-"""
-
-problem_solving_medium = """
-- Require application of {topic} concepts in moderately complex scenarios
-- Involve multi-step problem-solving or combining multiple simple concepts related to {topic}
-- Test understanding of programming principles as they relate to {topic}
-- Include more nuanced distractors that require careful consideration of behavior with {topic}
-- Involve control structures, basic algorithms, or simple data structures in the context of {topic}
-- May require analysis of short code snippets or simple debugging tasks involving {topic}
-
-Example:
-Q: What will be the output of the following code demonstrating {topic}?
-1) [Moderate complexity result 1]
-2) [Moderate complexity result 2]
-3) [Moderate complexity result 3]
-4) [Moderate complexity result 4]
-Correct answer: [Correct option number]
-"""
-
-problem_solving_hard = """
-- Test deep understanding and ability to apply advanced {topic} concepts in complex scenarios
-- Require critical thinking, problem-solving, and analysis of sophisticated code related to {topic}
-- Involve advanced concepts like algorithms, data structures, or language-specific features as they pertain to {topic}
-- Have very plausible distractors that require expert knowledge of {topic} to differentiate
-- May require optimization, debugging of complex code, or understanding of underlying principles in relation to {topic}
-- Focus on efficiency, best practices, and idiomatic solutions involving {topic}
-
-Example:
-Q: Which of the following code snippets most efficiently implements {topic}?
-1) ```
-   // Complex implementation option 1
-   ```
-2) ```
-   // Complex implementation option 2
-   ```
-3) ```
-   // Complex implementation option 3
-   ```
-4) ```
-   // Complex implementation option 4
-   ```
-Correct answer: [Correct option number]
-"""
-
 def generate_mcqs(topic, num_questions, difficulty, question_type, selected_filters=None, max_retries=3):
-    difficulty_definitions = {
-        "Conceptual": {
-            "Easy": conceptual_factual_easy,
-            "Medium": conceptual_factual_medium,
-            "Hard": conceptual_factual_hard
-        },
-        "Factual": {
-            "Easy": conceptual_factual_easy,
-            "Medium": conceptual_factual_medium,
-            "Hard": conceptual_factual_hard
-        },
-        "Problem-solving": {
-            "Easy": problem_solving_easy,
-            "Medium": problem_solving_medium,
-            "Hard": problem_solving_hard
-        }
-    }
+    logging.info(f"Generating MCQs for topic: {topic}, num_questions: {num_questions}, difficulty: {difficulty}, question_type: {question_type}")
+    
+    # Validate inputs
+    valid_difficulties = ["Easy", "Medium", "Hard"]
+    valid_question_types = ["Conceptual", "Factual", "Problem-solving", "Scenario-based"]
+    
+    if difficulty not in valid_difficulties:
+        logging.error(f"Invalid difficulty: {difficulty}")
+        raise ValueError(f"Invalid difficulty. Must be one of {valid_difficulties}")
+    
+    if question_type not in valid_question_types:
+        logging.error(f"Invalid question_type: {question_type}")
+        raise ValueError(f"Invalid question_type. Must be one of {valid_question_types}")
 
-    question_type_instructions = {
-        "Conceptual": conceptual_instruction,
-        "Factual": factual_instruction,
-        "Problem-solving": problem_solving_instruction
-    }
+    # Safely get relevant examples
+    try:
+        relevant_examples = few_shot_examples.get(question_type, {}).get(difficulty, "")
+        relevant_examples = relevant_examples.format(topic=topic)
+    except KeyError as e:
+        logging.error(f"KeyError when accessing few_shot_examples: {e}")
+        relevant_examples = ""  # Use an empty string if the key is not found
+    except Exception as e:
+        logging.error(f"Error when formatting few_shot_examples: {e}")
+        relevant_examples = ""  # Use an empty string if there's any other error
+
+    # Meta-sorting prompt
+    meta_sorting_prompt = f"""
+    Task: Create a structured plan for generating {num_questions} {difficulty}-level {question_type} MCQs about {topic}.
+
+    First, review these example questions in the desired format:
+
+    {relevant_examples}
+
+    Now, create a plan following this structure:
+
+    1. List {num_questions} distinct sub-topics or aspects of {topic} that would be appropriate for {difficulty}-level {question_type} questions.
+    2. For each sub-topic, briefly describe a specific concept or problem that could be addressed in an MCQ.
+    3. Indicate the type of question (e.g., definition, application, analysis) for each sub-topic.
+    4. Suggest a plausible correct answer and three distractors for each question.
+
+    Format your response as a numbered list, with each item containing:
+    - Sub-topic
+    - Specific concept/problem
+    - Question type
+    - Correct answer
+    - Three distractors
+
+    Example:
+    1. Sub-topic: [Specific aspect of {topic}]
+       Concept: [Brief description of the concept to be tested]
+       Question type: [e.g., Definition, Application, Analysis]
+       Correct answer: [Brief description of the correct answer]
+       Distractors: [Three plausible but incorrect options]
+
+    2. ...
+
+    Ensure that your plan covers a diverse range of aspects within {topic} and aligns with the {difficulty} difficulty level and {question_type} question type. Use the provided examples as a guide for the level of detail and complexity expected.
+    """
+
+    # Generate the meta-sorting plan
+    for attempt in range(max_retries):
+        try:
+            meta_sorting_response = client.chat.completions.create(
+                model="gpt-4o-mini",  # Update with your model name
+                messages=[
+                    {"role": "system", "content": f"You are an expert in {topic} and MCQ planning. Your task is to create a structured plan for generating high-quality, specific multiple-choice questions about {topic}, using the provided examples as a guide."},
+                    {"role": "user", "content": meta_sorting_prompt}
+                ]
+            )
+            if meta_sorting_response and meta_sorting_response.choices:
+                meta_sorting_plan = meta_sorting_response.choices[0].message.content
+                break
+            else:
+                logging.error("Empty response from LLM for meta-sorting")
+        except Exception as e:
+            logging.error(f"Meta-sorting attempt {attempt + 1} failed: {str(e)}")
+            if attempt < max_retries - 1:
+                time.sleep(2)  # Wait before retrying
+    else:
+        raise Exception("Failed to generate meta-sorting plan after multiple attempts")
 
     difficulty_definition = difficulty_definitions[question_type][difficulty].format(topic=topic)
     question_type_instruction = question_type_instructions[question_type].format(topic=topic)
@@ -257,22 +134,68 @@ def generate_mcqs(topic, num_questions, difficulty, question_type, selected_filt
     if selected_filters and question_type == "Problem-solving":
         question_type_instruction += f"\nFocus specifically on these types of problem-solving questions: {', '.join(selected_filters)}."
 
-    prompt = prompt_template.format(
-        topic=topic,
-        num_questions=num_questions,
-        difficulty=difficulty,
-        question_type=question_type,
-        difficulty_definition=difficulty_definition,
-        question_type_instruction=question_type_instruction
-    )
+    # Enhanced prompt with meta-sorting plan and few-shot examples
+    enhanced_prompt = f"""
+    Task: Generate {num_questions} unique multiple-choice questions (MCQs) about {topic} with {difficulty} difficulty. The questions should be of type: {question_type}.
 
+    Context: You are an expert in {topic} and an experienced educator. Your goal is to create challenging yet fair MCQs that test a student's understanding of {topic} at the {difficulty} level.
+
+    First, review these example questions in the desired format:
+
+    {relevant_examples}
+
+    Now, use the following meta-sorting plan to guide your question generation:
+
+    {meta_sorting_plan}
+
+    Guidelines:
+    1. Ensure all questions are directly related to {topic} and follow the structure provided in the meta-sorting plan.
+    2. Adhere to the following difficulty level:
+    {difficulty_definition}
+
+    3. Follow these question type instructions:
+    {question_type_instruction}
+
+    4. Use the following format for each question, similar to the examples provided:
+
+    Q[number]. [Question text]
+    1) [Option 1]
+    2) [Option 2]
+    3) [Option 3]
+    4) [Option 4]
+    Correct answer: [Correct option number]
+    Difficulty: {difficulty}
+    Subject: [Relevant subject area]
+    Topic: {topic}
+    Sub-topic: [Relevant sub-topic of {topic} from the meta-sorting plan]
+    Tags: [Relevant tags related to {topic}]
+
+    ---
+
+    5. Ensure each question is separated by the "---" delimiter.
+    6. Vary the complexity and focus of the questions while maintaining the specified difficulty level and question type.
+    7. For each question, randomize the order of the options and ensure the correct answer is not always in the same position.
+    8. Include a mix of straightforward and thought-provoking questions to test different levels of understanding.
+    9. Use clear and concise language, avoiding ambiguity in both questions and answer options.
+    10. For problem-solving questions, include code snippets where appropriate, using a general programming syntax that can be understood across different languages.
+
+    Quality Check:
+    - Ensure each question has exactly one correct answer.
+    - Verify that all distractors (incorrect options) are plausible but clearly incorrect to a knowledgeable student.
+    - Check that the questions cover a range of aspects within the {topic}, as outlined in the meta-sorting plan.
+    - Confirm that the difficulty of each question matches the specified {difficulty} level.
+
+    Begin generating the MCQs now, using the meta-sorting plan and example questions as a guide. Remember to maintain high quality and relevance throughout all {num_questions} questions.
+    """
+
+    # Generate the MCQs using the enhanced prompt with meta-sorting and few-shot examples
     for attempt in range(max_retries):
         try:
             response = client.chat.completions.create(
                 model="gpt-4o-mini",  # Update with your model name
                 messages=[
-                    {"role": "system", "content": f"You are an expert in {topic}. Your task is to generate multiple-choice questions specifically about {topic}, adhering strictly to the given instructions for {question_type} questions at {difficulty} difficulty."},
-                    {"role": "user", "content": prompt}
+                    {"role": "system", "content": f"You are an expert in {topic} and MCQ generation. Your task is to create high-quality, specific multiple-choice questions about {topic}, strictly adhering to the given instructions, meta-sorting plan, and example questions for {question_type} questions at {difficulty} difficulty."},
+                    {"role": "user", "content": enhanced_prompt}
                 ]
             )
             if response and response.choices:
