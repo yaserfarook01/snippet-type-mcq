@@ -21,7 +21,7 @@ st.header("Generate MCQs")
 topic = st.text_input("Enter Topic:")
 num_questions = st.number_input("Number of Questions to Generate", min_value=1, max_value=100, value=10)
 difficulty = st.selectbox("Select Difficulty Level", ["Easy", "Medium", "Hard"])
-question_type = st.selectbox("Select Question Type", ["Conceptual", "Factual", "Problem-solving"])
+question_type = st.selectbox("Select Question Type", ["Conceptual", "Factual", "Problem-solving", "Scenario-based"])
 
 # Add filter options for problem-solving questions
 selected_filters = []
@@ -104,7 +104,7 @@ st.header(f"Import MCQs to {domain}")
 
 if 'selected_qb_id' in st.session_state:
     qb_id = st.session_state.selected_qb_id
-    st.write(f"Selected Question Bank ID: {qb_id}")
+    # st.write(f"Selected Question Bank ID: {qb_id}")
 else:
     qb_id = st.text_input("Enter Question Bank ID (qb_id):")
 
