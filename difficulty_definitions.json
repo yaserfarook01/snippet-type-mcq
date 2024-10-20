@@ -1,0 +1,22 @@
+{
+    "Conceptual": {
+      "Easy": "- Test basic understanding and recall of {topic} concepts\n- Use simple terminology and straightforward questions\n- Focus on fundamental aspects of {topic}\n- Have clear, distinct options with only one correct answer\n- Require basic knowledge and simple application of {topic}",
+      "Medium": "- Test deeper understanding of {topic} concepts\n- Require application of knowledge in slightly more complex scenarios\n- May involve comparing or contrasting different aspects of {topic}\n- Include more nuanced options that require careful consideration\n- Test understanding of how {topic} relates to other basic programming concepts",
+      "Hard": "- Test advanced understanding and intricate details of {topic}\n- Require analysis and evaluation of complex aspects of {topic}\n- May involve edge cases or less common applications of {topic}\n- Have very plausible distractors that require expert knowledge to differentiate\n- Test deep understanding of how {topic} interacts with advanced programming concepts"
+    },
+    "Factual": {
+      "Easy": "- Test basic recall of facts about {topic}\n- Use simple, direct questions about well-known aspects of {topic}\n- Focus on commonly known information about {topic}\n- Have clear, distinct options with only one correct answer\n- Require basic familiarity with {topic} terminology and concepts",
+      "Medium": "- Test recall of more specific or detailed facts about {topic}\n- Require understanding of relationships between different facts about {topic}\n- May involve applying factual knowledge to simple scenarios\n- Include options that require careful discrimination between similar facts\n- Test understanding of how factual knowledge about {topic} applies in practice",
+      "Hard": "- Test recall and understanding of advanced or specialized facts about {topic}\n- Require integration of multiple facts or concepts related to {topic}\n- May involve applying factual knowledge to complex or unusual scenarios\n- Have very plausible distractors that require expert knowledge to differentiate\n- Test deep understanding of the implications and applications of factual knowledge about {topic}"
+    },
+    "Problem-solving": {
+      "Easy": "- Test basic problem-solving skills related to {topic}\n- Involve simple, straightforward problems with clear solutions\n- Focus on fundamental applications of {topic} concepts\n- Have clear, distinct options with only one correct answer\n- Require basic knowledge and simple application of {topic} principles",
+      "Medium": "- Test more advanced problem-solving skills related to {topic}\n- Involve moderately complex problems that require multiple steps or concepts\n- May require combining different aspects of {topic} to solve the problem\n- Include options that require careful analysis to determine the best solution\n- Test ability to apply {topic} concepts in less straightforward scenarios",
+      "Hard": "- Test advanced problem-solving and analytical skills related to {topic}\n- Involve complex problems that require deep understanding and creative thinking\n- May require identifying and applying multiple concepts or techniques related to {topic}\n- Have very plausible distractors that require expert knowledge to differentiate\n- Test ability to optimize solutions and consider edge cases in {topic}-related problems"
+    },
+    "Scenario-based": {
+      "Easy": "- Present simple, straightforward scenarios related to {topic}\n- Use common, everyday situations where {topic} is applied\n- Focus on basic applications of {topic} concepts\n- Require minimal analysis to connect the scenario to {topic}\n- Have clear, distinct options with only one correct answer",
+      "Medium": "- Present more complex scenarios that require deeper understanding of {topic}\n- Use realistic situations that professionals might encounter\n- Require application of multiple concepts related to {topic}\n- Need moderate analysis to determine the best solution\n- Include options that require careful consideration of the scenario details",
+      "Hard": "- Present intricate, multi-faceted scenarios that challenge even experienced professionals\n- Use complex, real-world situations that require in-depth knowledge of {topic}\n- Require synthesis of multiple advanced concepts related to {topic}\n- Need thorough analysis and possibly multiple steps to arrive at the correct solution\n- Include very plausible distractors that require expert knowledge to differentiate"
+    }
+  }
