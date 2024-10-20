@@ -17,15 +17,34 @@ client = AzureOpenAI(
     api_version="2024-02-01"
 )
 
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Load JSON files
-with open('question_type_instructions.json', 'r') as f:
-    question_type_instructions = json.load(f)
+try:
+    with open('question_type_instructions.json', 'r') as f:
+        question_type_instructions = json.load(f)
+    logger.info("Successfully loaded question_type_instructions.json")
+except Exception as e:
+    logger.error(f"Error loading question_type_instructions.json: {e}")
+    question_type_instructions = {}
 
-with open('difficulty_definitions.json', 'r') as f:
-    difficulty_definitions = json.load(f)
+try:
+    with open('difficulty_definitions.json', 'r') as f:
+        difficulty_definitions = json.load(f)
+    logger.info("Successfully loaded difficulty_definitions.json")
+except Exception as e:
+    logger.error(f"Error loading difficulty_definitions.json: {e}")
+    difficulty_definitions = {}
 
-with open('few_shot_examples.json', 'r') as f:
-    few_shot_examples = json.load(f)
+try:
+    with open('few_shot_examples.json', 'r') as f:
+        few_shot_examples = json.load(f)
+    logger.info("Successfully loaded few_shot_examples.json")
+except Exception as e:
+    logger.error(f"Error loading few_shot_examples.json: {e}")
+    few_shot_examples = {}
 
 # Define problem_solving_types
 problem_solving_types = [
@@ -47,7 +66,7 @@ problem_solving_types = [
 ]
 
 def generate_mcqs(topic, num_questions, difficulty, question_type, selected_filters=None, max_retries=3):
-    logging.info(f"Generating MCQs for topic: {topic}, num_questions: {num_questions}, difficulty: {difficulty}, question_type: {question_type}")
+    logging.info(f"Generating MCQs for topic: {topic}, num_questions: {num_questions}, difficulty: {difficulty}, question_type: {question_type}, filters: {selected_filters}")
     
     # Validate inputs
     valid_difficulties = ["Easy", "Medium", "Hard"]
@@ -60,6 +79,20 @@ def generate_mcqs(topic, num_questions, difficulty, question_type, selected_filt
     if question_type not in valid_question_types:
         logging.error(f"Invalid question_type: {question_type}")
         raise ValueError(f"Invalid question_type. Must be one of {valid_question_types}")
+
+    # Initialize question_type_instruction
+    question_type_instruction = question_type_instructions[question_type].format(topic=topic)
+
+    # Add filter-specific instructions
+    filter_instructions = ""
+    if selected_filters:
+        filter_instructions = "Focus EXCLUSIVELY on the following types of questions:\n"
+        for filter_type in selected_filters:
+            if filter_type in problem_solving_types:
+                filter_instructions += f"- {filter_type}\n"
+
+    # Retrieve relevant examples
+    relevant_examples = few_shot_examples.get(question_type, {}).get(difficulty, "").format(topic=topic)
 
     # Safely get relevant examples
     try:
@@ -149,14 +182,16 @@ def generate_mcqs(topic, num_questions, difficulty, question_type, selected_filt
     {meta_sorting_plan}
 
     Guidelines:
-    1. Ensure all questions are directly related to {topic} and follow the structure provided in the meta-sorting plan.
+    1. Ensure all questions are directly related to {topic}.
     2. Adhere to the following difficulty level:
-    {difficulty_definition}
+    {difficulty_definitions[question_type][difficulty].format(topic=topic)}
 
     3. Follow these question type instructions:
     {question_type_instruction}
 
-    4. Use the following format for each question, similar to the examples provided:
+    4. {filter_instructions}
+
+    5. Use the following format for each question:
 
     Q[number]. [Question text]
     1) [Option 1]
@@ -175,9 +210,8 @@ def generate_mcqs(topic, num_questions, difficulty, question_type, selected_filt
     5. Ensure each question is separated by the "---" delimiter.
     6. Vary the complexity and focus of the questions while maintaining the specified difficulty level and question type.
     7. For each question, randomize the order of the options and ensure the correct answer is not always in the same position.
-    8. Include a mix of straightforward and thought-provoking questions to test different levels of understanding.
-    9. Use clear and concise language, avoiding ambiguity in both questions and answer options.
-    10. For problem-solving questions, include code snippets where appropriate, using a general programming syntax that can be understood across different languages.
+    8. Use clear and concise language, avoiding ambiguity in both questions and answer options.
+    9. For problem-solving questions, include code snippets where appropriate, using a general programming syntax that can be understood across different languages.
 
     Quality Check:
     - Ensure each question has exactly one correct answer.
@@ -185,7 +219,7 @@ def generate_mcqs(topic, num_questions, difficulty, question_type, selected_filt
     - Check that the questions cover a range of aspects within the {topic}, as outlined in the meta-sorting plan.
     - Confirm that the difficulty of each question matches the specified {difficulty} level.
 
-    Begin generating the MCQs now, using the meta-sorting plan and example questions as a guide. Remember to maintain high quality and relevance throughout all {num_questions} questions.
+    Begin generating the MCQs now, using the example questions as a guide. Remember to maintain high quality and relevance throughout all {num_questions} questions, focusing ONLY on the specified question types and formats.
     """
 
     # Generate the MCQs using the enhanced prompt with meta-sorting and few-shot examples
