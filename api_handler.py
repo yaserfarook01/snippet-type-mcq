@@ -1,16 +1,20 @@
 import requests
 import json
 import logging
+import os
+from dotenv import load_dotenv
+# Load environment variables
+load_dotenv()
 
 def get_all_qbs(token, search=None, page=1, limit=100):
-    url = 'https://api.examly.io/api/v2/questionbanks'
+    url = os.getenv('GET_ALL_QB_API')
     headers = {
         'accept': 'application/json, text/plain, */*',
         'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8',
         'authorization': token,
         'content-type': 'application/json',
-        'origin': 'https://admin.ltimindtree.iamneo.ai',
-        'referer': 'https://admin.ltimindtree.iamneo.ai/',
+        'origin': os.getenv('LTI_ORGIN'),
+        'referer': os.getenv('LTI_REFERER'),
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'
     }
     payload = {
@@ -39,14 +43,14 @@ def import_mcqs_to_examly(input_file, qb_id, created_by, token):
     with open(input_file, 'r', encoding='utf-8') as f:
         unique_questions = json.load(f)
     
-    url = 'https://api.examly.io/api/mcq_question/create'
+    url = os.getenv('CREATE_QUESTION')
     headers = {
         'accept': 'application/json, text/plain, */*',
         'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8',
         'authorization': token,
         'content-type': 'application/json',
-        'origin': 'https://admin.ltimindtree.iamneo.ai',
-        'referer': 'https://admin.ltimindtree.iamneo.ai/',
+        'origin': os.getenv('LTI_ORGIN'),
+        'referer': os.getenv('LTI_REFERER'),
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'
     }
     
@@ -73,14 +77,14 @@ def import_mcqs_to_examly(input_file, qb_id, created_by, token):
 
     
 def get_all_qbs_neowise(token, search=None, page=1, limit=25):
-    url = 'https://api.examly.io/api/v2/questionbanks'
+    url = os.getenv('GET_ALL_QB_API')
     headers = {
         'accept': 'application/json, text/plain, */*',
         'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8',
         'authorization': token,
         'content-type': 'application/json',
-        'origin': 'https://admin.neowise.examly.io',
-        'referer': 'https://admin.neowise.examly.io/',
+        'origin': os.getenv('NEOWISE_ORGIN'),
+        'referer': os.getenv('NEOWISE_REFERER'),
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'
     }
     payload = {
@@ -109,14 +113,14 @@ def import_mcqs_to_neowise(input_file, qb_id, created_by, token):
     with open(input_file, 'r', encoding='utf-8') as f:
         unique_questions = json.load(f)
     
-    url = 'https://api.examly.io/api/mcq_question/create'
+    url = os.getenv('CREATE_QUESTION')
     headers = {
         'accept': 'application/json, text/plain, */*',
         'accept-language': 'en-GB,en-US;q=0.9,en;q=0.8',
         'authorization': token,
         'content-type': 'application/json',
-        'origin': 'https://admin.neowise.examly.io',
-        'referer': 'https://admin.neowise.examly.io/',
+        'origin': os.getenv('NEOWISE_ORGIN'),
+        'referer': os.getenv('NEOWISE_REFERER'),
         'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0.0.0 Safari/537.36'
     }
     
