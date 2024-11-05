@@ -3,10 +3,12 @@ import json
 import os
 import logging
 import traceback
+import time
 from prompt import generate_mcqs, problem_solving_types
 from db import question_bank
 from api_handler import get_all_qbs, import_mcqs_to_examly, get_all_qbs_neowise, import_mcqs_to_neowise
 from convertor import save_to_file, convert_to_json_format, save_unique_mcqs
+from qc import process_mcqs 
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -30,30 +32,73 @@ if question_type == "Problem-solving":
 
 if st.button("Generate MCQs"):
     try:
+        # Initialize progress tracking
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        # Step 1: Generate MCQs (20%)
+        status_text.text("🤖 Generating MCQs...")
+        progress_bar.progress(20)
         mcqs = generate_mcqs(topic, num_questions, difficulty, question_type, selected_filters)
         question_prompt_file = 'question_prompt.txt'
         save_to_file(question_prompt_file, mcqs)
-        st.success(f"{num_questions} {question_type} MCQs generated and saved to {question_prompt_file}.")
         
-        # Convert generated MCQs to JSON format
-        created_by = "19d0e40a-fd35-4741-89ab-11f3c7d4b118"  # This could be made an input if needed
-        json_questions = convert_to_json_format(question_prompt_file, None, created_by)
+        # Step 2: Quality Check (40%)
+        status_text.text("🔍 Performing quality check with Claude...")
+        progress_bar.progress(40)
+        success, corrected_mcqs, qc_report = process_mcqs(
+            question_prompt_file, 
+            'qced_mcq.txt',
+            'qc_logs.txt'
+        )
         
-        st.info(f"Total questions converted to JSON: {len(json_questions)}")
-        
-        # Add unique questions to Elasticsearch and get the list of unique questions
-        unique_questions, duplicates = question_bank.add_unique_questions(json_questions)
-        
-        # Save unique questions to a new file
-        unique_mcqs_file = 'unique_mcqs.json'
-        with open(unique_mcqs_file, 'w', encoding='utf-8') as f:
-            json.dump(unique_questions, f, ensure_ascii=False, indent=2)
-        
-        st.success(f"{len(unique_questions)} new unique questions added to Elasticsearch and saved to {unique_mcqs_file}. {duplicates} duplicates skipped.")
-        
+        if success:
+            # Step 3: Convert to JSON (60%)
+            status_text.text("📝 Converting to JSON format...")
+            progress_bar.progress(60)
+            created_by = "19d0e40a-fd35-4741-89ab-11f3c7d4b118"
+            json_questions = convert_to_json_format('qced_mcq.txt', None, created_by, expected_count=num_questions)
+            
+            # Step 4: Add to Database (80%)
+            status_text.text("💾 Adding to database...")
+            progress_bar.progress(80)
+            unique_questions, duplicates = question_bank.add_unique_questions(json_questions)
+            
+            # Step 5: Save Results (100%)
+            status_text.text("✅ Finalizing results...")
+            progress_bar.progress(100)
+            unique_mcqs_file = 'unique_mcqs.json'
+            with open(unique_mcqs_file, 'w', encoding='utf-8') as f:
+                json.dump(unique_questions, f, ensure_ascii=False, indent=2)
+            
+            # Clear progress indicators
+            time.sleep(1)
+            status_text.empty()
+            progress_bar.empty()
+            
+            # Display results
+            if "No issues found" in qc_report:
+                st.success("✅ Generation completed successfully!")
+            else:
+                st.warning("⚠️ Generation completed with some corrections")
+                with st.expander("View QC Report"):
+                    st.text(qc_report)
+            
+            st.info(f"📊 Generated: {len(json_questions)} questions")
+            st.success(f"✅ Unique questions: {len(unique_questions)}")
+            if duplicates > 0:
+                st.warning(f"⚠️ Duplicates skipped: {duplicates}")
+            
+        else:
+            progress_bar.empty()
+            status_text.empty()
+            st.error("❌ QC process failed. Please check the logs for details.")
+            
     except Exception as e:
-        st.error(f"Error generating MCQs: {str(e)}")
-        logger.exception("Error in MCQ generation and processing")
+        progress_bar.empty()
+        status_text.empty()
+        st.error(f"❌ Error: {str(e)}")
+        logger.exception("Error in MCQ generation")
 
 # Domain Selection
 st.header("Select Domain")
@@ -69,55 +114,107 @@ if 'question_banks' not in st.session_state:
 
 if st.button("Search Question Banks"):
     if token:
-        with st.spinner("Searching question banks..."):
+        progress = st.progress(0)
+        status = st.empty()
+        
+        try:
+            status.text("🔍 Initializing search...")
+            progress.progress(25)
+            time.sleep(0.5)
+            
+            status.text("🔍 Searching question banks...")
+            progress.progress(50)
+            
             if domain == "LTI":
                 question_banks = get_all_qbs(token, search_query, limit=50)
-            else:  # Neowise
+            else:
                 question_banks = get_all_qbs_neowise(token, search_query, limit=50)
-        st.session_state.question_banks = question_banks
+            
+            status.text("✨ Processing results...")
+            progress.progress(100)
+            time.sleep(0.5)
+            
+            st.session_state.question_banks = question_banks
+            
+            status.empty()
+            progress.empty()
+            
+        except Exception as e:
+            progress.empty()
+            status.empty()
+            st.error(f"❌ Search failed: {str(e)}")
     else:
-        st.warning("Please enter your authorization token.")
+        st.warning("⚠️ Please enter your authorization token.")
 
 if st.session_state.question_banks:
     question_banks = st.session_state.question_banks
     if 'results' in question_banks and 'questionbanks' in question_banks['results']:
         qb_options = [(qb['qb_name'], qb['qb_id']) for qb in question_banks['results']['questionbanks']]
+        st.success(f"✅ Found {len(qb_options)} matching question banks")
         
-        st.success(f"Found {len(qb_options)} matching question banks.")
-        
-        # Use radio buttons for selection
-        st.subheader("Select a Question Bank:")
         selected_qb = st.radio(
-            "Choose a question bank:",
+            "Select Question Bank:",
             options=qb_options,
-            format_func=lambda x: x[0]  # Display only the name in the radio button
+            format_func=lambda x: x[0]
         )
 
         if selected_qb:
-            st.session_state.selected_qb_id = selected_qb[1]  # Store the selected qb_id
-            st.info(f"Selected Question Bank: {selected_qb[0]}")
+            st.session_state.selected_qb_id = selected_qb[1]
+            st.info(f"📌 Selected: {selected_qb[0]}")
     else:
-        st.error("Failed to fetch question banks. Please check your token and try again.")
+        st.error("❌ Failed to fetch question banks")
 
 # MCQ Import Section
 st.header(f"Import MCQs to {domain}")
 
 if 'selected_qb_id' in st.session_state:
     qb_id = st.session_state.selected_qb_id
-    # st.write(f"Selected Question Bank ID: {qb_id}")
 else:
-    qb_id = st.text_input("Enter Question Bank ID (qb_id):")
+    qb_id = st.text_input("Enter Question Bank ID:")
 
 if st.button(f"Import MCQs to {domain}"):
     if qb_id and token:
+        progress = st.progress(0)
+        status = st.empty()
+        
         try:
+            status.text("📤 Preparing for import...")
+            progress.progress(25)
+            time.sleep(0.5)
+            
+            status.text("📤 Importing questions...")
+            progress.progress(50)
+            
             if domain == "LTI":
-                successful_uploads, failed_uploads = import_mcqs_to_examly('unique_mcqs.json', qb_id, "19d0e40a-fd35-4741-89ab-11f3c7d4b118", token)
-            else:  # Neowise
-                successful_uploads, failed_uploads = import_mcqs_to_neowise('unique_mcqs.json', qb_id, "19d0e40a-fd35-4741-89ab-11f3c7d4b118", token)
-            st.success(f"MCQs imported to {domain}. Successful: {successful_uploads}, Failed: {failed_uploads}")
+                successful_uploads, failed_uploads = import_mcqs_to_examly(
+                    'unique_mcqs.json', qb_id, 
+                    "19d0e40a-fd35-4741-89ab-11f3c7d4b118", token
+                )
+            else:
+                successful_uploads, failed_uploads = import_mcqs_to_neowise(
+                    'unique_mcqs.json', qb_id,
+                    "19d0e40a-fd35-4741-89ab-11f3c7d4b118", token
+                )
+            
+            status.text("✨ Finalizing import...")
+            progress.progress(100)
+            time.sleep(0.5)
+            
+            status.empty()
+            progress.empty()
+            
+            st.success(f"✅ Import completed")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Successfully Imported", successful_uploads)
+            with col2:
+                st.metric("Failed Imports", failed_uploads)
+            
         except Exception as e:
-            st.error(f"Error importing MCQs: {str(e)}")
-            st.error(f"Error details: {traceback.format_exc()}")
+            progress.empty()
+            status.empty()
+            st.error(f"❌ Import Error: {str(e)}")
+            with st.expander("View Error Details"):
+                st.code(traceback.format_exc())
     else:
-        st.warning("Please enter valid Question Bank ID and Authorization Token.")
+        st.warning("⚠️ Please enter Question Bank ID and Authorization Token")
