@@ -5,3 +5,4 @@ openai==0.28.0
 elasticsearch==8.10.1
 sentence-transformers==2.2.2
 anthropic
+pillow>=9.5.0
